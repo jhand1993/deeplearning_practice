@@ -1,6 +1,6 @@
 from torch.utils.data import Dataset
 from torchvision.transforms import ToTensor
-from torch import tensor
+from torch import tensor, float32
 from skimage import io
 from pathlib import Path
 from numpy import array

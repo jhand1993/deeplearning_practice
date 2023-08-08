@@ -59,7 +59,7 @@ def train_bic_model(
     ) -> float:
     """ Trains binary classification model 'model'. 'opt' should be a 
         PyTorch Optimizer object, while loss must be a callable scalar
-        function.   
+        function. Includes basic loss logging during training and validation. 
 
     Args:
         train_dl (torch.utils.data.DataLoader): Training DataLoader object.
@@ -73,18 +73,21 @@ def train_bic_model(
     Returns:
         float: Validation loss for final epoch. 
     """
+    # This extracts the DataLoader's input DataSet object and returns its length. 
+    full_size = len(train_dl.dataset)
+
     for epoch in range(n_epoch):
         # We need to set the model to 'train mode'.
         model.train()
 
-        # Iterate throught he batched training data.
-        for xb, yb in train_dl:
+        # Iterate throught he batched training data. We use enumerate to keep track 
+        # of the batch number for logging purposes
+        for batch, (xb, yb) in enumerate(train_dl):
             # First, feed forward data through the model and get prediction.
             pred = model(xb)
 
             # Second, calculate the loss between prediction and dependent variable.
-            print(pred.shape, yb.shape)
-            loss = loss_fn(pred, yb)
+            loss = loss_fn(pred, yb.float())
 
             # Third, propagate the backward gradient calculations.
             loss.backward()
@@ -94,6 +97,14 @@ def train_bic_model(
 
             # Fifth, after each batch, zero the gradients. 
             opt.zero_grad()
+
+            # Log training loss every 25 batches. 
+            if batch % 25 == 0:
+                # This converts the current batch index to the sample size. 
+                current_size = (batch + 1) * len(xb)
+                print(
+                    f'Batch [{current_size:>5d}/{full_size:>5d}] loss: {loss.item():7f}.'
+                )
         
         # Now that the model has been training, we can evaluate its performance
         # using the validation set by setting the model to 'evalucation model'.
@@ -106,7 +117,8 @@ def train_bic_model(
             # We don't need to call the optimizer here since we are just 
             # evaluating. 
             losses, n_b = map(
-                torch.tensor, zip(*[(loss(model(xv), yv), len(yv)) for xv, yv in valid_dl])
+                torch.tensor,
+                zip(*[(loss_fn(model(xv), yv.float()), len(yv)) for xv, yv in valid_dl])
             )
 
             # The code above is a bit dense, so I've broken it up into a for-loop 
@@ -121,9 +133,21 @@ def train_bic_model(
             # losses = torch.tensor(losses)
             # n_b = torch.tensor(n_b)
 
-            validation_loss = torch.sum(losses) / torch.sum(n_b)
+            validation_loss = torch.sum(losses) / len(n_b)
         
-        print(f'Epoch {epoch} validation loss: {round(validation_loss.item(), 5)}.')
-        return validation_loss
+        # Log validation loss after each training epoch. 
+        print(f'Epoch {epoch} validation loss: {validation_loss.item():>7f}.')
+        print('---------------------------------------')
+    return validation_loss
 
 
+def reset_params(model: torch.nn.Module) -> None:
+    """ Resets parameters for valid layers. 
+
+    Args:
+        model (torch.nn.Module): Model with parameters to reset. 
+    """
+    for layer in model.children():
+        # Not all layers have parameters (e.g. Flatten()).
+        if hasattr(layer, 'reset_parameters'):
+            layer.reset_parameters()
