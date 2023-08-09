@@ -1,6 +1,6 @@
 from torch.utils.data import Dataset
 from torchvision.transforms import ToTensor
-from torch import tensor, float32
+from torch import tensor
 from skimage import io
 from pathlib import Path
 from numpy import array
@@ -44,7 +44,7 @@ class CatDogDataSet(Dataset):
         """
         return len(list(self.cat_path.glob('*.jpg'))) + len(list(self.dog_path.glob('*.jpg')))
     
-    def __getitem__(self, idx) -> tuple:
+    def __getitem__(self, idx: int) -> tuple:
         """ Return elements 'idx' of the data set
 
         Args:
@@ -52,10 +52,9 @@ class CatDogDataSet(Dataset):
         """
         idx_path = self.idx_to_name[idx]
 
-        # This might seem odd to use, but torchvision.io.read_image()
-        # is not working for this set of jpg images. As such, we load it
-        # using scikit-image and then transform the numpy array into a 
-        # PyTorch Tensor.
+        # This might seem odd to use, but torchvision.io.read_image() is not working for this 
+        # set of jpg images. As such, we load it using scikit-image and then transform the numpy 
+        # array into a PyTorch Tensor.
         image = io.imread(str(idx_path))
         image = ToTensor()(image)
         label = self._get_label(idx_path)
@@ -76,7 +75,7 @@ class CatDogDataSet(Dataset):
             idx_path (Path): Path to check. 
         """
         if idx_path.parts[-2] == 'Cat':
-            return tensor(1)
+            return tensor(1.)
 
         else:
-            return tensor(0)
+            return tensor(0.)

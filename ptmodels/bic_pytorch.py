@@ -12,19 +12,20 @@ class Logistic(torch.nn.Module):
         self.logistic = torch.nn.Sequential(
             torch.nn.Flatten(),
             torch.nn.Linear(n_in, 1), 
-            torch.nn.Sigmoid()
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         """ Forward call.
 
         Args:
-            x (tensor.Tensor): Input tensor of dimension 4.
+            x (torch.Tensor): Input tensor of dimension 4.
 
         Returns:
-            tesnor.Tesnor: output logits tensor of dimension 1. 
+            torch.Tensor: output logits tensor of dimension 1. 
         """
+        # print(torch.nn.Flatten()(x).shape)
         return torch.squeeze(self.logistic(x).T) # return logits.
+
 
 class Perceptron(torch.nn.Module):
     """ Three layer perceptron NN model.
@@ -42,11 +43,20 @@ class Perceptron(torch.nn.Module):
             torch.nn.ReLU(),
             torch.nn.Linear(n1, n2),
             torch.nn.ReLU(),
-            torch.nn.Linear(n2, 1)
+            torch.nn.Linear(n2, 1),
         )
     
-    def forward(self, x):
-        return torch.squeeze(self.logistic(x).T) # return logits.
+    def forward(self, x: torch.Tensor):
+        """ Forward call.
+
+        Args:
+            x (torch.Tensor): Input tensor of dimension 4.
+
+        Returns:
+            torch.Tensor: output logits tensor of dimension 1. 
+    
+        """
+        return torch.squeeze(self.ml_percep(x).T) # return logits.
     
 
 def train_bic_model(
@@ -87,16 +97,13 @@ def train_bic_model(
             pred = model(xb)
 
             # Second, calculate the loss between prediction and dependent variable.
-            loss = loss_fn(pred, yb.float())
+            loss = loss_fn(pred, yb)
 
             # Third, propagate the backward gradient calculations.
             loss.backward()
 
             # Fourth, use loss gradient to update parameters. 
             opt.step()
-
-            # Fifth, after each batch, zero the gradients. 
-            opt.zero_grad()
 
             # Log training loss every 25 batches. 
             if batch % 25 == 0:
@@ -105,6 +112,10 @@ def train_bic_model(
                 print(
                     f'Batch [{current_size:>5d}/{full_size:>5d}] loss: {loss.item():7f}.'
                 )
+                # param = torch.concat([p.flatten() for p in model.parameters()], dim=0)
+                # print(f'Gradient^2: {torch.dot(param.grad, param.grad)}')
+            # Fifth, after each batch, zero the gradients. 
+            opt.zero_grad()
         
         # Now that the model has been training, we can evaluate its performance
         # using the validation set by setting the model to 'evalucation model'.
@@ -118,7 +129,7 @@ def train_bic_model(
             # evaluating. 
             losses, n_b = map(
                 torch.tensor,
-                zip(*[(loss_fn(model(xv), yv.float()), len(yv)) for xv, yv in valid_dl])
+                zip(*[(loss_fn(model(xv), yv), len(yv)) for xv, yv in valid_dl])
             )
 
             # The code above is a bit dense, so I've broken it up into a for-loop 
