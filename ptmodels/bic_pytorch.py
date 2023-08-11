@@ -3,7 +3,7 @@ import torch
 class Logistic(torch.nn.Module):
     """ This is a simple logistics regression implemented with PyTorch. 
     """
-    def __init__(self, n_in: int):
+    def __init__(self, n_in: int) -> None:
         """ 
         Args:
             n_in (int): Dimension of input. 
@@ -14,7 +14,7 @@ class Logistic(torch.nn.Module):
             torch.nn.Linear(n_in, 1), 
         )
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """ Forward call.
 
         Args:
@@ -23,14 +23,13 @@ class Logistic(torch.nn.Module):
         Returns:
             torch.Tensor: output logits tensor of dimension 1. 
         """
-        # print(torch.nn.Flatten()(x).shape)
         return torch.squeeze(self.logistic(x).T) # return logits.
 
 
 class Perceptron(torch.nn.Module):
     """ Three layer perceptron NN model.
     """
-    def __init__(self, n_layers: list):
+    def __init__(self, n_layers: list) -> None:
         """
         Args:
             n_layers (sequential): List of layer dimensions.
@@ -46,7 +45,7 @@ class Perceptron(torch.nn.Module):
             torch.nn.Linear(n2, 1),
         )
     
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """ Forward call.
 
         Args:
@@ -57,6 +56,57 @@ class Perceptron(torch.nn.Module):
     
         """
         return torch.squeeze(self.ml_percep(x).T) # return logits.
+    
+
+class ConvNet(torch.nn.Module):
+    """ Two layer ConvNet that then feeds into two linear layers before a 
+        sigmoid function.  Stride is fixed to 1. 
+    """
+    def __init__(self, k1: int, k2: int, n3: int, pad='same') -> None:
+        """
+
+        Args:
+            k1 (int): Square kernel size for convolution layer 1.
+            k2 (int): Square kernel size for convoltuion layer 2.
+            n3 (int): Linear layer 3 output size.
+            pad (str or float, optional): Padding to preserve image size.
+                Defaults to 'same' to preserve image size.
+        """
+
+        super().__init__()
+
+        # Save arguments as attributes for easy access. 
+        self.k1 = k1
+        self.k2 = k2
+        self.p1 = pad
+        self.p2 = pad
+        self.n3 = n3
+
+        self.convnet = torch.nn.Sequential(
+            torch.nn.Conv2d(3, 6, k1, stride=1, padding=pad),
+            torch.nn.ReLU(),
+            torch.nn.MaxPool2d(4, 4),
+            torch.nn.Conv2d(6, 12, k2, stride=1, padding=pad),
+            torch.nn.ReLU(),
+            torch.nn.MaxPool2d(4, 4),
+            torch.nn.Flatten(),
+            # Poolings cuts pixel count to 8 * 8, while channel count
+            # increases to 12: flattened vector should be 8 * 8 * 12 = 768.
+            torch.nn.Linear(768, n3),
+            torch.nn.ReLU(),
+            torch.nn.Linear(n3, 1)
+        )
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """ Forward call.
+
+        Args:
+            x (torch.Tensor): Input tensor of dimension 4.
+
+        Returns:
+            torch.Tensor: output logits tensor of dimension 1. 
+        """
+        return torch.squeeze(self.convnet(x).T)
     
 
 def train_bic_model(
@@ -147,7 +197,7 @@ def train_bic_model(
             validation_loss = torch.sum(losses) / len(n_b)
         
         # Log validation loss after each training epoch. 
-        print(f'Epoch {epoch} validation loss: {validation_loss.item():>7f}.')
+        print(f'Epoch {epoch + 1} validation loss: {validation_loss.item():>7f}.')
         print('---------------------------------------')
     return validation_loss
 
