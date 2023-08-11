@@ -2,7 +2,7 @@
 """
 from unittest import TestCase
 from ptmodels import bic_pytorch as bp
-from torch import Size, rand, manual_seed
+from torch import rand, manual_seed
 
 
 class LogistiscsTestCase(TestCase):
@@ -45,7 +45,7 @@ class ConvNetTestCase(TestCase):
             Implicitly tests the output shape as well. 
         """
         manual_seed(0)
-        x_in = rand((1, 3, 128, 128)) # ConvNet is hardcoded to handle 128x128 images. 
+        x_in = rand((1, 3, 128, 128)) # ConvNet is hard-coded to handle 128x128 images. 
         x_out = bp.ConvNet(7, 3, 16)(x_in)
         self.assertAlmostEqual(x_out.item(), 0.2774, places=3)
 
