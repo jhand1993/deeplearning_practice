@@ -23,7 +23,8 @@ class Logistic(torch.nn.Module):
         Returns:
             torch.Tensor: output logits tensor of dimension 1. 
         """
-        return torch.squeeze(self.logistic(x).T) # return logits.
+        y = self.logistic(x)
+        return y.T.squeeze() # return logits.
 
 
 class Perceptron(torch.nn.Module):
@@ -36,7 +37,7 @@ class Perceptron(torch.nn.Module):
         """
         super().__init__()
         n0, n1, n2 = n_layers
-        self.ml_percep = torch.nn.Sequential(
+        self.percep = torch.nn.Sequential(
             torch.nn.Flatten(),
             torch.nn.Linear(n0, n1),
             torch.nn.ReLU(),
@@ -55,7 +56,7 @@ class Perceptron(torch.nn.Module):
             torch.Tensor: output logits tensor of dimension 1. 
     
         """
-        return torch.squeeze(self.ml_percep(x).T) # return logits.
+        return torch.squeezes(self.percep(x).T) # return logits.
     
 
 class ConvNet(torch.nn.Module):
@@ -115,7 +116,8 @@ def train_bic_model(
         model: torch.nn.Module, 
         opt: torch.optim.Optimizer,
         loss_fn: callable, 
-        n_epoch: int
+        n_epoch: int,
+        device: str
     ) -> float:
     """ Trains binary classification model 'model'. 'opt' should be a 
         PyTorch Optimizer object, while loss must be a callable scalar
@@ -129,6 +131,7 @@ def train_bic_model(
         opt (torch.optim.Optimizer): Optimizer object instance.
         loss_fn (callable): Scalar function used to calculate loss. 
         n_epoch (int): Number of epochs. 
+        device (str): Device to run Tensors on. 
     
     Returns:
         float: Validation loss for final epoch. 
@@ -144,10 +147,10 @@ def train_bic_model(
         # of the batch number for logging purposes
         for batch, (xb, yb) in enumerate(train_dl):
             # First, feed forward data through the model and get prediction.
-            pred = model(xb)
+            pred = model(xb.to(device))
 
             # Second, calculate the loss between prediction and dependent variable.
-            loss = loss_fn(pred, yb)
+            loss = loss_fn(pred, yb.to(device))
 
             # Third, propagate the backward gradient calculations.
             loss.backward()
@@ -179,7 +182,7 @@ def train_bic_model(
             # evaluating. 
             losses, n_b = map(
                 torch.tensor,
-                zip(*[(loss_fn(model(xv), yv), len(yv)) for xv, yv in valid_dl])
+                zip(*[(loss_fn(model(xv.to(device)), yv.to(device)), len(yv)) for xv, yv in valid_dl])
             )
 
             # The code above is a bit dense, so I've broken it up into a for-loop 
