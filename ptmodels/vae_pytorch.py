@@ -109,7 +109,7 @@ def train_AE(
             reconstruction = model(xb)
 
             # Calculate loss.
-            loss = loss_fn(reconstruction, xb)
+            loss = loss_fn(reconstruction, model.flatten(xb))
 
             # Backpropagate.
             loss.backward()
@@ -118,7 +118,7 @@ def train_AE(
             opt.step()
 
             # Log training loss every 25 batches.
-            if i % 25 == 0:
+            if i % 200 == 0:
                 # This converts the current batch index to the sample size.
                 s = (i + 1) * len(xb)
                 print(
@@ -140,9 +140,14 @@ def train_AE(
             losses, n_b = map(
                 torch.tensor,
                 zip(
-                    *[(loss_fn(model(xv.to(device)), xv.to(device)),
-                        xv.shape[0])
-                        for xv, _ in valid_dl]
+                    *[
+                        (loss_fn(
+                            model(xv.to(device)),
+                            model.flatten(xv.to(device))
+                        ),
+                            xv.shape[0])
+                        for xv, _ in valid_dl
+                    ]
                 )
             )
 

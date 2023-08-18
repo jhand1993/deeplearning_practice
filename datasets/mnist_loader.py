@@ -1,6 +1,8 @@
 from torchvision import transforms
 from torchvision.datasets import MNIST, FashionMNIST, KMNIST, QMNIST, EMNIST
+from torch.utils.data import DataLoader
 from torch.nn.functional import one_hot
+from torch import tensor
 
 
 def load_MNISTlike(
@@ -43,19 +45,21 @@ def load_MNISTlike(
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
     ])
-    target_transform_list = lambda x: one_hot(x, 10)
+    target_transform_list = lambda x: one_hot(tensor(x), 10)
 
     # Load the training and validation DataLoaders.
-    train_loader = target_obj(
-        '/files/', train=True, download=True,
-        transform=transform_list, target_transform=target_transform_list,
-        batch_size=batch_size_train, shuffle=True
+    train_loader = DataLoader(
+        target_obj(
+            '/files/', train=True, download=True,
+            transform=transform_list, target_transform=target_transform_list,
+        ), batch_size=batch_size_train, shuffle=True
     )
 
-    valid_loader = target_obj(
-        '/files/', train=True, download=True,
-        transform=transform_list, target_transform=target_transform_list,
-        batch_size=batch_size_validation, shuffle=True
+    valid_loader = DataLoader(
+        target_obj(
+            '/files/', train=False, download=True,
+            transform=transform_list, target_transform=target_transform_list,
+        ), batch_size=batch_size_validation, shuffle=True
     )
 
     return train_loader, valid_loader
