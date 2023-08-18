@@ -114,9 +114,9 @@ class ConvNet(torch.nn.Module):
 def train_bic_model(
         train_dl: torch.utils.data.DataLoader,
         valid_dl: torch.utils.data.DataLoader,
-        model: torch.nn.Module, 
+        model: torch.nn.Module,
         opt: torch.optim.Optimizer,
-        loss_fn: callable, 
+        loss_fn: callable,
         n_epoch: int,
         device: str
 ) -> float:
@@ -180,12 +180,12 @@ def train_bic_model(
         # waste of resources!
         with torch.no_grad():
             # We don't need to call the optimizer here since we are just
-            # evaluating. 
+            # evaluating.
             losses, n_b = map(
                 torch.tensor,
                 zip(
                     *[(loss_fn(model(xv.to(device)), yv.to(device)), len(yv))
-                      for xv, yv in valid_dl]
+                        for xv, yv in valid_dl]
                 )
             )
 
@@ -194,8 +194,8 @@ def train_bic_model(
             # losses = []
             # n_b = []
             # for xv, yv in valid_dl:
-            #     pred = model(xv)
-            #     loss = loss_fn(pred, yv)
+            #     pred = model(xv.to(device))
+            #     loss = loss_fn(pred, yv.to(device))
             #     losses.append(loss)
             #     n_b.append(len(yv))
             # losses = torch.tensor(losses)

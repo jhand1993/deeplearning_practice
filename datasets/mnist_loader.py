@@ -19,7 +19,7 @@ def load_MNISTlike(
         tuple: tuple of DataLoader instances -- one for training set,
             another for testing
     """
-    # Select appropriate DataSet Object.
+    # Select appropriate DataSet object.
     if target_set == 'MNIST':
         target_obj = MNIST
 
