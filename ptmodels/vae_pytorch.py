@@ -64,6 +64,39 @@ class SymmetricLinearAE(torch.nn.Module):
         x = self.decoder(x)
         return self.sigmoid(x)
 
+    def get_encoding(self, x: torch.Tensor) -> torch.Tensor:
+        """ Returns the latent encoded representation in the batch 'x'.
+
+        Args:
+            x (torch.tensor): Batch of images that will be flattened and
+                and encoded.
+
+        Returns:
+            torch.Tensor: Latent representaiton for each element of batch
+                'x'.
+        """
+        x = self.flatten(x)
+        x = self.encoder(x)
+        return x
+
+    @staticmethod
+    def normalize_encoding(x: torch.Tensor) -> torch.Tensor:
+        """ Normalizes each of the latent components to have mean of
+            zero and standard deviation of one.
+
+        Args:
+            x (torch.Tensor): Tensor of encoding vectors.
+
+        Returns:
+            torch.Tensor: Normalized tensor of encoding vectors.
+        """
+        # We want to retain the dimensionality of the mean and std vectors
+        # --- this will allow easy broadcasting of element-wise addition
+        # and division.
+        mu = torch.mean(x, -1, keepdim=True)
+        sig = torch.std(x, -1, keepdim=True)
+        return (x - mu) / sig
+
 
 def train_AE(
         train_dl: torch.utils.data.DataLoader,
