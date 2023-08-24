@@ -1,54 +1,20 @@
 import torch
+from typing import Iterable
+from math import sqrt
 
 
-class SymmetricLinearAE(torch.nn.Module):
-    """ Symmetric five-layer linear autoencoder model. Batch
-        normalization is used between layers for both the encoder
-        and decoder.
+class BaseAE(torch.nn.Module):
+    """ Torch.nn.Module subclass with autoencoder functionality.
+        The final layer is assumed to be a sigmoid activation.
     """
-    def __init__(self, n_layers: list, n_latent: int) -> None:
-        """
-        Args:
-            n_layers (list): Starting and two intermediate layer
-                sizes. n_layers[0] is the flattened input layer
-                dimensionality.
-            n_latent (int): Latent space dimensionality.
-        """
+    def __init__(self) -> None:
         super().__init__()
-        n1, n2, n3 = n_layers
+        self.encoder = torch.nn.Identity()
+        self.decoder = torch.nn.Identity()
 
-        # Specify model flattener.
-        self.flatten = torch.nn.Flatten()
-
-        # Define five-layer encoder with batch normalization.
-        self.encoder = torch.nn.Sequential(
-            torch.nn.Linear(n1, n2, bias=False),
-            torch.nn.BatchNorm1d(n2),
-            torch.nn.ReLU(),
-            torch.nn.Linear(n2, n3, bias=False),
-            torch.nn.BatchNorm1d(n3),
-            torch.nn.ReLU(),
-            torch.nn.Linear(n3, n_latent),
-            torch.nn.BatchNorm1d(n_latent),
-            torch.nn.ReLU()
-        )
-
-        # Define five-layer decoder with batch normalization.
-        # It is a mirror of the encoder architecture apart from
-        # the final activation being omitted.
-        self.decoder = torch.nn.Sequential(
-            torch.nn.Linear(n_latent, n3, bias=False),
-            torch.nn.BatchNorm1d(n3),
-            torch.nn.ReLU(),
-            torch.nn.Linear(n3, n2, bias=False),
-            torch.nn.BatchNorm1d(n2),
-            torch.nn.ReLU(),
-            torch.nn.Linear(n2, n1),
-            torch.nn.BatchNorm1d(n1)
-        )
-
-        # Define final sigmoid activation layer.
-        self.sigmoid = torch.nn.Sigmoid()
+        # Define final sigmoid activation that will be used after
+        # decoding.
+        self.last_activation = torch.nn.Sigmoid()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """ Forward call for autoencoder.
@@ -59,24 +25,36 @@ class SymmetricLinearAE(torch.nn.Module):
         Returns:
             torch.Tensor: Predicted batch tensor.
         """
-        x = self.flatten(x)
         x = self.encoder(x)
         x = self.decoder(x)
-        return self.sigmoid(x)
+        return self.last_activation(x)
 
     def get_encoding(self, x: torch.Tensor) -> torch.Tensor:
-        """ Returns the latent encoded representation in the batch 'x'.
+        """ Returns the latent encoded representation for the batch 'x'.
 
         Args:
-            x (torch.tensor): Batch of images that will be flattened and
-                and encoded.
+            x (torch.tensor): Batch of images that will be encoded.
 
         Returns:
-            torch.Tensor: Latent representaiton for each element of batch
+            torch.Tensor: Latent representation for each element from batch
                 'x'.
         """
-        x = self.flatten(x)
         x = self.encoder(x)
+        return x
+
+    def get_decoding(self, x: torch.Tensor) -> torch.Tensor:
+        """ Returns decoding prediction from encoded representation for the
+            batch 'x'.
+
+        Args:
+            x (torch.tensor): Batch of encodings that will be decoded.
+
+        Returns:
+            torch.Tensor: Predicted representation for each element from batch
+                'x'.
+        """
+        x = self.decoder(x)
+        x = self.last_activation(x)
         return x
 
     @staticmethod
@@ -96,6 +74,166 @@ class SymmetricLinearAE(torch.nn.Module):
         mu = torch.mean(x, -1, keepdim=True)
         sig = torch.std(x, -1, keepdim=True)
         return (x - mu) / sig
+
+
+class SymmetricLinearAE(BaseAE):
+    """ Symmetric five-layer linear autoencoder model. Batch
+        normalization is used between layers for both the encoder
+        and decoder.
+    """
+    def __init__(self, n_layers: list, n_latent: int) -> None:
+        """
+        Args:
+            n_layers (list): Starting and two intermediate layer
+                sizes. n_layers[0] is the flattened input layer
+                dimensionality.
+            n_latent (int): Latent space dimensionality.
+        """
+        super().__init__()
+        n1, n2, n3 = n_layers
+
+        # Define five-layer encoder with batch normalization.
+        # Start with flattening input image tensors.
+        self.encoder = torch.nn.Sequential(
+            torch.nn.Flatten(),
+            torch.nn.Linear(n1, n2, bias=False),
+            torch.nn.BatchNorm1d(n2),
+            torch.nn.ReLU(),
+            torch.nn.Linear(n2, n3, bias=False),
+            torch.nn.BatchNorm1d(n3),
+            torch.nn.ReLU(),
+            torch.nn.Linear(n3, n_latent, bias=False),
+            torch.nn.BatchNorm1d(n_latent),
+            torch.nn.Tanh()
+        )
+
+        # Define five-layer decoder with batch normalization.
+        # It is a mirror of the encoder architecture apart from
+        # the final activation being omitted.
+        self.decoder = torch.nn.Sequential(
+            torch.nn.Linear(n_latent, n3, bias=False),
+            torch.nn.BatchNorm1d(n3),
+            torch.nn.ReLU(),
+            torch.nn.Linear(n3, n2, bias=False),
+            torch.nn.BatchNorm1d(n2),
+            torch.nn.ReLU(),
+            torch.nn.Linear(n2, n1, bias=False),
+            torch.nn.BatchNorm1d(n1)
+        )
+
+
+class ConvNetAE(BaseAE):
+    """ Image autoencoder roughly mirroring AlexNet.  Square kernels
+        are used for each convnet layer.  Max pooling decreases
+        dimensionality by a factor of two per-axis.
+    """
+    def __init__(
+            self, channels: Iterable[int], k_layers: Iterable[int],
+            n_flat: int, n_latent: int
+    ) -> None:
+        """
+        Args:
+            channels (Iterable[int]): List of input and output channels.
+                These are chained together.
+            k_layers (Iterable[int]): List of square kernel sizes.
+            self (int): flattened linear layer input size.
+            n_latent (int): Latent space dimension.  Must be the square of
+                a non-zero integer.
+
+        Raises:
+            ValueError: channels and k_layers inconsistent.
+        """
+        super().__init__()
+        # Make sure number of channels and kernels are consistent.
+        try:
+            assert len(channels) == len(k_layers) + 1
+
+        except AssertionError:
+            raise ValueError('channels and k_layers lengths inconsistent.')
+
+        # Make sure n_latent is the square of a non-zero integer.
+        try:
+            assert sqrt(n_latent) % 1. == 0.
+
+        except AssertionError:
+            raise ValueError(
+                'n_latent must be the square of a non-zero integer.'
+            )
+
+        # This is a bit obtuse, but a method in the madness is present.
+        # The first list creates len(k_layer) ConvNet blocks per user request.
+        # The second list adds the dense linear portion of the encoder network.
+        # The two combined lists are then unpacked as arguments for
+        # Sequential().
+        encoder_list = [
+            ConvNetAE.cn_block(
+                channels[i], channels[i + 1], k_layers[i], 2
+            ) for i in range(len(k_layers))
+
+        ] + [
+            torch.nn.Flatten(),
+            torch.nn.Linear(n_flat, n_latent, bias=False),
+            torch.nn.BatchNorm1d(n_latent),
+            torch.nn.Tanh()
+        ]
+
+        self.encoder = torch.nn.Sequential(**encoder_list)
+
+        # Same reasoning as that provided above.
+        decoder_list = [
+            torch.nn.Unflatten()
+        ] + [
+            ConvNetAE.tcn_block(
+                channels[i + 1], channels[i], 3
+            ) for i in range(len(k_layers), 1, -1)
+        ] + [
+            torch.nn.ConvTranspose2d(channels[1], channels[0], 3)
+        ]
+
+        self.decoder = torch.nn.Sequential(**decoder_list)
+
+    @staticmethod
+    def cn_block(
+        c_in: int, c_out: int, k: int, p: int
+    ) -> torch.nn.Sequential:
+        """ ConvNet block that includes square kernel convolution
+            with stride=1, ReLU activation, and max pooling.
+
+        Args:
+            c_in (int): Number of input channels.
+            c_out (int): Number of output channels.
+            k (int): Square kernel size.
+            p (int): Pooling size and stride.
+
+        Returns:
+            torch.nn.Sequential: Convnet block.
+        """
+        return torch.nn.Sequential(
+            torch.nn.Conv2d(c_in, c_out, k, stride=1, padding='same'),
+            torch.nn.ReLU(),
+            torch.nn.MaxPool2d(p, p)
+        )
+
+    @staticmethod
+    def tcn_block(
+        c_in: int, c_out: int, k: int
+    ) -> torch.nn.Sequential:
+        """ Transpose convnet block with an ReLU activation and stride=1.
+            Note that the pooling size/stride size + 1 should be used for the
+            transpose kernel.
+
+        Args:
+            c_in (int): Number of input channels.
+            c_out (int): Number of output channels.
+            k (int): Square kernel size.
+
+        Returns:
+            torch.nn.Sequential: Transpose convent block.
+        """
+        return torch.nn.Sequential(
+            torch.nn.ConvTranspose2d(c_in, c_out, k, stride=1),
+            torch.nn.ReLU()
+        )
 
 
 def train_AE(
@@ -142,7 +280,7 @@ def train_AE(
             reconstruction = model(xb)
 
             # Calculate loss.
-            loss = loss_fn(reconstruction, model.flatten(xb))
+            loss = loss_fn(reconstruction, torch.nn.Flatten()(xb))
 
             # Backpropagate.
             loss.backward()
@@ -176,7 +314,7 @@ def train_AE(
                     *[
                         (loss_fn(
                             model(xv.to(device)),
-                            model.flatten(xv.to(device))
+                            torch.nn.Flatten()(xv.to(device))
                         ),
                             xv.shape[0])
                         for xv, _ in valid_dl

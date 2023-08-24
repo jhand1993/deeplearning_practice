@@ -4,6 +4,8 @@ from torch.utils.data import DataLoader
 from torch.nn.functional import one_hot
 from torch import tensor
 
+from pathlib import Path
+
 
 def load_MNISTlike(
         target_set: str = 'MNIST',
@@ -50,14 +52,14 @@ def load_MNISTlike(
     # Load the training and validation DataLoaders.
     train_loader = DataLoader(
         target_obj(
-            '/files/', train=True, download=True,
+            str(Path(f'datasets/{target_set}')), train=True, download=True,
             transform=transform_list, target_transform=target_transform_list,
         ), batch_size=batch_size_train, shuffle=True
     )
 
     valid_loader = DataLoader(
         target_obj(
-            '/files/', train=False, download=True,
+            str(Path(f'datasets/{target_set}')), train=False, download=True,
             transform=transform_list, target_transform=target_transform_list,
         ), batch_size=batch_size_validation, shuffle=True
     )
