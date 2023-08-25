@@ -136,9 +136,10 @@ class ConvNetAE(BaseAE):
             channels (Iterable[int]): List of input and output channels.
                 These are chained together.
             k_layers (Iterable[int]): List of square kernel sizes.
-            self (int): flattened linear layer input size.
-            n_latent (int): Latent space dimension.  Must be the square of
-                a non-zero integer.
+            n_flat (int): flattened linear layer input size.  Must be
+                the square of a non-zero integer, which will necessarily
+                be true if images are square.
+            n_latent (int): Latent space dimension.
 
         Raises:
             ValueError: channels and k_layers inconsistent.
@@ -153,11 +154,11 @@ class ConvNetAE(BaseAE):
 
         # Make sure n_latent is the square of a non-zero integer.
         try:
-            assert sqrt(n_latent) % 1. == 0.
+            assert sqrt(n_flat) % 1. == 0.
 
         except AssertionError:
             raise ValueError(
-                'n_latent must be the square of a non-zero integer.'
+                'n_flat must be the square of a non-zero integer.'
             )
 
         # This is a bit obtuse, but a method in the madness is present.
@@ -177,20 +178,25 @@ class ConvNetAE(BaseAE):
             torch.nn.Tanh()
         ]
 
-        self.encoder = torch.nn.Sequential(**encoder_list)
+        self.encoder = torch.nn.Sequential(*encoder_list)
 
-        # Same reasoning as that provided above.
+        # Same reasoning as that provided above. Note we need to unflatten
+        # the n_flat into the first ConvNet layer of the decoder.
+        nl_in = int(sqrt(n_flat))
         decoder_list = [
-            torch.nn.Unflatten()
+            torch.nn.Linear(n_latent, n_flat, bias=False),
+            torch.nn.BatchNorm1d(n_flat),
+            torch.nn.ReLU(),
+            torch.nn.Unflatten(-1, (nl_in, nl_in))
         ] + [
             ConvNetAE.tcn_block(
                 channels[i + 1], channels[i], 3
-            ) for i in range(len(k_layers), 1, -1)
+            ) for i in range(len(k_layers) - 1, 0, -1)
         ] + [
             torch.nn.ConvTranspose2d(channels[1], channels[0], 3)
         ]
 
-        self.decoder = torch.nn.Sequential(**decoder_list)
+        self.decoder = torch.nn.Sequential(*decoder_list)
 
     @staticmethod
     def cn_block(
