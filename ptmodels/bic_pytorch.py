@@ -57,7 +57,7 @@ class Perceptron(torch.nn.Module):
             torch.Tensor: output logits tensor of dimension 1.
 
         """
-        return torch.squeezes(self.percep(x).T)  # return logits.
+        return torch.squeeze(self.percep(x).T)  # return logits.
 
 
 class ConvNet(torch.nn.Module):

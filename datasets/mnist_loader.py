@@ -3,6 +3,7 @@ from torchvision.datasets import MNIST, FashionMNIST, KMNIST, QMNIST, EMNIST
 from torch.utils.data import DataLoader
 from torch.nn.functional import one_hot
 from torch import tensor
+from typing import Callable
 
 from pathlib import Path
 
@@ -10,7 +11,12 @@ from pathlib import Path
 def load_MNISTlike(
         target_set: str = 'MNIST',
         batch_size_train: int = 64,
-        batch_size_validation: int = 128
+        batch_size_validation: int = 128,
+        transform: Callable = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.1307,), (0.3081,))
+        ]),
+        target_transform: Callable = lambda x: one_hot(tensor(x), 10)
 ) -> tuple:
     """ Wrapper to load MNIST-compatible data sets from torchvision.
 
@@ -19,6 +25,14 @@ def load_MNISTlike(
         batch_size_train (int): Training batch size.  Defaults to 64.
         batch_size_validation (int): Validation batch size.  Defaults to
             128.
+        transform (Callable): Transforms on input feature data.  Defaults to
+            transforms.Compose([
+                        transforms.ToTensor(),
+                        transforms.Normalize((0.1307,), (0.3081,))
+            ]).
+        target_transform (Callable): Transform for output label data.
+            Defaults to lambda x: one_hot(tensor(x), 10).
+
     Returns:
         tuple: tuple of DataLoader instances -- one for training set,
             another for testing
@@ -42,25 +56,18 @@ def load_MNISTlike(
     else:
         raise ValueError(f'Invalid value {target_set} for target_set.')
 
-    # Set up Transforms, including one-hot encoding.
-    transform_list = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))
-    ])
-    target_transform_list = lambda x: one_hot(tensor(x), 10)
-
     # Load the training and validation DataLoaders.
     train_loader = DataLoader(
         target_obj(
             str(Path(f'datasets/{target_set}')), train=True, download=True,
-            transform=transform_list, target_transform=target_transform_list,
+            transform=transform, target_transform=target_transform,
         ), batch_size=batch_size_train, shuffle=True
     )
 
     valid_loader = DataLoader(
         target_obj(
             str(Path(f'datasets/{target_set}')), train=False, download=True,
-            transform=transform_list, target_transform=target_transform_list,
+            transform=transform, target_transform=target_transform,
         ), batch_size=batch_size_validation, shuffle=True
     )
 
