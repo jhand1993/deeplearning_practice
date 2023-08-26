@@ -76,49 +76,60 @@ class BaseAE(torch.nn.Module):
         return (x - mu) / sig
 
 
-class SymmetricLinearAE(BaseAE):
-    """ Symmetric five-layer linear autoencoder model. Batch
-        normalization is used between layers for both the encoder
-        and decoder.
+class DenseAE(BaseAE):
+    """ Five-layer linear autoencoder model. Batch normalization is used
+        between layers for both the encoder and decoder.
     """
-    def __init__(self, n_layers: list, n_latent: int) -> None:
+    def __init__(self, n_layers: Iterable[int], n_latent: int) -> None:
         """
         Args:
-            n_layers (list): Starting and two intermediate layer
+            n_layers (Iterable[int]): Starting and two intermediate layer
                 sizes. n_layers[0] is the flattened input layer
-                dimensionality.
-            n_latent (int): Latent space dimensionality.
+                dimension.
+            n_latent (int): Latent space dimension.
         """
         super().__init__()
-        n1, n2, n3 = n_layers
-
-        # Define five-layer encoder with batch normalization.
-        # Start with flattening input image tensors.
+        # The encoder and decoder has duplicated blocks, so these
+        # have been iterated and unpacked as their own Sequential instances.
+        # This also allows for an arbitrary number of hidden layers.
         self.encoder = torch.nn.Sequential(
             torch.nn.Flatten(),
-            torch.nn.Linear(n1, n2, bias=False),
-            torch.nn.BatchNorm1d(n2),
-            torch.nn.ReLU(),
-            torch.nn.Linear(n2, n3, bias=False),
-            torch.nn.BatchNorm1d(n3),
-            torch.nn.ReLU(),
-            torch.nn.Linear(n3, n_latent, bias=False),
+            *[
+                DenseAE.ln_block(n_layers[i], n_layers[i + 1])
+                for i in range(len(n_layers) - 1)
+            ],
+            torch.nn.Linear(n_layers[-1], n_latent, bias=False),
             torch.nn.BatchNorm1d(n_latent),
             torch.nn.Tanh()
         )
 
-        # Define five-layer decoder with batch normalization.
-        # It is a mirror of the encoder architecture apart from
-        # the final activation being omitted.
         self.decoder = torch.nn.Sequential(
-            torch.nn.Linear(n_latent, n3, bias=False),
-            torch.nn.BatchNorm1d(n3),
-            torch.nn.ReLU(),
-            torch.nn.Linear(n3, n2, bias=False),
-            torch.nn.BatchNorm1d(n2),
-            torch.nn.ReLU(),
-            torch.nn.Linear(n2, n1, bias=False),
-            torch.nn.BatchNorm1d(n1)
+            DenseAE.ln_block(n_latent, n_layers[-1]),
+            *[
+                DenseAE.ln_block(n_layers[i + 1], n_layers[i])
+                for i in range(len(n_layers) - 2, 0, -1)
+            ],
+            torch.nn.Linear(n_layers[1], n_layers[0], bias=False),
+            torch.nn.BatchNorm1d(n_layers[0])
+        )
+
+    @staticmethod
+    def ln_block(n_in: int, n_out: int) -> torch.nn.Sequential:
+        """ Linear network block with batch normalization and
+            ReLU activation
+
+        Args:
+            n_in (int): Input size.
+            n_out (int): Output size
+
+        Returns:
+            torch.nn.Sequential: Dense network, batch normalization,
+                and ReLU activation sequence.
+        """
+        return torch.nn.Sequential(
+            torch.nn.Linear(n_in, n_out, bias=False),
+            torch.nn.BatchNorm1d(n_out),
+            torch.nn.ReLU()
         )
 
 
@@ -191,7 +202,7 @@ class ConvNetAE(BaseAE):
         ] + [
             ConvNetAE.tcn_block(
                 channels[i + 1], channels[i], 3
-            ) for i in range(len(k_layers) - 1, 0, -1)
+            ) for i in range(len(k_layers) - 2, 0, -1)
         ] + [
             torch.nn.ConvTranspose2d(channels[1], channels[0], 3)
         ]
