@@ -80,15 +80,42 @@ class DenseAE(BaseAE):
     """ Five-layer linear autoencoder model. Batch normalization is used
         between layers for both the encoder and decoder.
     """
-    def __init__(self, n_layers: Iterable[int], n_latent: int) -> None:
+    def __init__(
+        self,
+        n_layers: Iterable[int],
+        n_latent: int,
+        img_size: Iterable[int],
+        n_channels: int = None
+    ) -> None:
         """
         Args:
             n_layers (Iterable[int]): Starting and two intermediate layer
                 sizes. n_layers[0] is the flattened input layer
                 dimension.
             n_latent (int): Latent space dimension.
+            img_size (Iterable[int]): length-2 iterable giving input image
+                size.
+            n_channels (int): If provided, then data is unpacked as the
+                tuple (n_channels, *img_size) instead of just img_size.
+                Default is None.
         """
         super().__init__()
+
+        # Make sure img_size and n_layers are consistent spatial/volumentric
+        # data.
+        try:
+            if len(img_size) > 1:
+                assert img_size[0] * img_size[1] == n_layers[0]
+
+        except AssertionError:
+            raise ValueError(
+                'image_size must be consistent with n_layers first element.'
+            )
+
+        # Append n_channels if given.
+        if n_channels:
+            img_size = (n_channels, *img_size)
+
         # The encoder and decoder has duplicated blocks, so these
         # have been iterated and unpacked as their own Sequential instances.
         # This also allows for an arbitrary number of hidden layers.
@@ -110,7 +137,8 @@ class DenseAE(BaseAE):
                 for i in range(len(n_layers) - 2, 0, -1)
             ],
             torch.nn.Linear(n_layers[1], n_layers[0], bias=False),
-            torch.nn.BatchNorm1d(n_layers[0])
+            torch.nn.BatchNorm1d(n_layers[0]),
+            torch.nn.Unflatten(-1, img_size)
         )
 
     @staticmethod
@@ -163,9 +191,10 @@ class ConvNetAE(BaseAE):
         except AssertionError:
             raise ValueError('channels and k_layers lengths inconsistent.')
 
-        # Make sure n_latent is the square of a non-zero integer.
+        # Make sure n_flat divided by the last channel size is the square
+        # of a non-zero integer.  This makes sure we recover a square image.
         try:
-            assert sqrt(n_flat) % 1. == 0.
+            assert sqrt(n_flat // channels[-1]) % 1. == 0.
 
         except AssertionError:
             raise ValueError(
@@ -192,19 +221,30 @@ class ConvNetAE(BaseAE):
         self.encoder = torch.nn.Sequential(*encoder_list)
 
         # Same reasoning as that provided above. Note we need to unflatten
-        # the n_flat into the first ConvNet layer of the decoder.
-        nl_in = int(sqrt(n_flat))
+        # the decoder's hidden linear layer into its first ConvNet layer.
+        nl_in = int(sqrt(n_flat // channels[-1]))
         decoder_list = [
             torch.nn.Linear(n_latent, n_flat, bias=False),
             torch.nn.BatchNorm1d(n_flat),
             torch.nn.ReLU(),
-            torch.nn.Unflatten(-1, (nl_in, nl_in))
+            torch.nn.Unflatten(-1, (channels[-1], nl_in, nl_in))
         ] + [
-            ConvNetAE.tcn_block(
-                channels[i + 1], channels[i], 3
-            ) for i in range(len(k_layers) - 2, 0, -1)
+            ConvNetAE.upcn_block(
+                channels[i + 1], channels[i], k_layers[i], 2
+            ) for i in range(len(k_layers) - 1, 0, -1)
         ] + [
-            torch.nn.ConvTranspose2d(channels[1], channels[0], 3)
+            torch.nn.Upsample(scale_factor=(2, 2)),
+            torch.nn.Conv2d(
+                channels[1], channels[0], k_layers[0],
+                stride=1, padding='same', bias=False
+            ),
+            torch.nn.BatchNorm2d(channels[0]),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(
+                channels[0], channels[0], k_layers[0],
+                stride=1, padding='same', bias=False
+            ),
+            torch.nn.BatchNorm2d(channels[0])
         ]
 
         self.decoder = torch.nn.Sequential(*decoder_list)
@@ -226,29 +266,51 @@ class ConvNetAE(BaseAE):
             torch.nn.Sequential: Convnet block.
         """
         return torch.nn.Sequential(
-            torch.nn.Conv2d(c_in, c_out, k, stride=1, padding='same'),
+            torch.nn.Conv2d(
+                c_in, c_out, k,
+                stride=1, padding='same', bias=False
+            ),
+            torch.nn.BatchNorm2d(c_out),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(
+                c_out, c_out, k,
+                stride=1, padding='same', bias=False
+            ),
+            torch.nn.BatchNorm2d(c_out),
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(p, p)
         )
 
     @staticmethod
-    def tcn_block(
-        c_in: int, c_out: int, k: int
+    def upcn_block(
+        c_in: int, c_out: int, k: int, d: int
     ) -> torch.nn.Sequential:
-        """ Transpose convnet block with an ReLU activation and stride=1.
-            Note that the pooling size/stride size + 1 should be used for the
-            transpose kernel.
+        """ A combination of upsampling by factor d, followed by a
+            convolution with kernel (k, k) with padding to preserve
+            upsampled image size.
 
         Args:
             c_in (int): Number of input channels.
             c_out (int): Number of output channels.
             k (int): Square kernel size.
+            d (int): Upsample factor.
 
         Returns:
             torch.nn.Sequential: Transpose convent block.
         """
         return torch.nn.Sequential(
-            torch.nn.ConvTranspose2d(c_in, c_out, k, stride=1),
+            torch.nn.Upsample(scale_factor=(d, d)),
+            torch.nn.Conv2d(
+                c_in, c_out, k,
+                stride=1, padding='same', bias=False
+            ),
+            torch.nn.BatchNorm2d(c_out),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(
+                c_out, c_out, k,
+                stride=1, padding='same', bias=False
+            ),
+            torch.nn.BatchNorm2d(c_out),
             torch.nn.ReLU()
         )
 
@@ -260,7 +322,7 @@ def train_AE(
         opt: torch.optim.Optimizer,
         loss_fn: callable,
         n_epoch: int,
-        device: str
+        device: str,
 ) -> float:
     """ Trains an autoencoder model 'model'. 'opt' should be a
         PyTorch Optimizer object, while loss must be a callable scalar
@@ -297,7 +359,7 @@ def train_AE(
             reconstruction = model(xb)
 
             # Calculate loss.
-            loss = loss_fn(reconstruction, torch.nn.Flatten()(xb))
+            loss = loss_fn(reconstruction, xb)
 
             # Backpropagate.
             loss.backward()
@@ -331,7 +393,7 @@ def train_AE(
                     *[
                         (loss_fn(
                             model(xv.to(device)),
-                            torch.nn.Flatten()(xv.to(device))
+                            xv.to(device)
                         ),
                             xv.shape[0])
                         for xv, _ in valid_dl
