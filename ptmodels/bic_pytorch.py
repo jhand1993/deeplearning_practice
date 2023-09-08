@@ -1,4 +1,5 @@
 import torch
+from typing import Iterable
 
 
 class Logistic(torch.nn.Module):
@@ -31,10 +32,10 @@ class Logistic(torch.nn.Module):
 class Perceptron(torch.nn.Module):
     """ Three layer perceptron NN model.
     """
-    def __init__(self, n_layers: list) -> None:
+    def __init__(self, n_layers: Iterable[int]) -> None:
         """
         Args:
-            n_layers (sequential): List of layer dimensions.
+            n_layers (Iterable[int]): Iterable of layer dimensions.
         """
         super().__init__()
         n0, n1, n2 = n_layers
@@ -74,7 +75,6 @@ class ConvNet(torch.nn.Module):
             pad (str or float, optional): Padding to preserve image size.
                 Defaults to 'same' to preserve image size.
         """
-
         super().__init__()
 
         # Save arguments as attributes for easy access.
