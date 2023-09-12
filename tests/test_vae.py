@@ -10,7 +10,10 @@ from ..ptmodels import vae_pytorch as vp
 from ..datasets import testing_loader as tl
 
 logger = logging.getLogger('__test_vae__')
-logger.setLevel(logging.DEBUG)
+logging.basicConfig(
+    filename='logs/test_vae.log', encoding='utf-8', level=logging.DEBUG
+)
+logger.setLevel(logging.WARNING)
 
 # Instantiate testing DataLoaders.
 test_shape = (1, 28, 28)
@@ -21,9 +24,6 @@ t_dl, v_dl = tl.load_TestDataSets(
 # Grab first input batch as a testing batch.
 for xb, _ in t_dl:
     x = xb
-
-# Test logg function alias.
-test_loss = binary_cross_entropy_with_logits
 
 
 def test_DenseAE() -> None:
@@ -38,14 +38,16 @@ def test_DenseAE() -> None:
     x_lat = test_model.get_encoding(x)
     x_pred = test_model.get_decoding(x_lat)
 
-    # make sure encoders and decoders are working.
-    assert x_lat.shape == (4, 3)
-    assert x_pred.shape == (4, *test_shape)  # append batch size to tuple
+    # Make sure encoders and decoders are working.
+    e_shape_bool = x_lat.shape == (4, 3)
+    # Also, append batch size to tuple,
+    d_shape_bool = x_pred.shape == (4, *test_shape)
 
     success = True
     try:
         vp.train_AE(
-            t_dl, v_dl, test_model, test_opt, test_loss,
+            t_dl, v_dl, test_model, test_opt,
+            binary_cross_entropy_with_logits,
             1, 'cpu'
         )
 
@@ -53,4 +55,4 @@ def test_DenseAE() -> None:
         logger.error('Exception: %s', e, exc_info=True)
         success = False
 
-    assert success
+    assert (e_shape_bool, d_shape_bool, success) == (1, 1, 1)

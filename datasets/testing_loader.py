@@ -26,7 +26,8 @@ class TestDataSet(Dataset):
             set_size: int,
             feature_shape: tuple[int],
             label_shape: tuple[int],
-            seed: int = 0
+            seed: int = 0,
+            scalar_label: bool = False
     ) -> None:
         """
         Args:
@@ -34,6 +35,9 @@ class TestDataSet(Dataset):
             feature_shape (tuple[int]): Shape of data set features.
             label_shape (tuple[int]): Shape of data set labels.
             seed (int, optional): Random seed. Defaults to 0.
+            scalar_label (bool): If provided, then the label shape
+                is ignored and a scalar label is sampled. Defaults
+                to False
         """
         super().__init__()
         self.set_size = set_size
@@ -43,9 +47,16 @@ class TestDataSet(Dataset):
         self.feature_tensor = random_image_set(
             (set_size, *feature_shape), seed=seed
         )
-        self.label_tensor = random_image_set(
-            (set_size, *label_shape), seed=seed
-        )
+
+        # Handle scalar labels if requested.
+        if scalar_label:
+            self.label_tensor = random_image_set(
+                (set_size,), seed=seed
+            )
+        else:
+            self.label_tensor = random_image_set(
+                (set_size, *label_shape), seed=seed
+            )
 
     def __len__(self) -> int:
         """ Returns length of data set, which is equal to self.set_size.
@@ -74,7 +85,8 @@ def load_TestDataSets(
     label_shape: tuple[int],
     batch_size_test: int,
     batch_size_validation: int,
-    seed: int = 0
+    seed: int = 0,
+    scalar_label: bool = False,
 ) -> tuple:
     """ Loads a test and validation DataLoader from TestDataSet.
         All DataLoaders shuffle input DataSets.
@@ -88,15 +100,20 @@ def load_TestDataSets(
         batch_size_validation (int): Validation DataLoader batch
             size.
         seed (int, optional): Random seed. Defaults to 0.
+        scalar_label (bool, optional).  If True, then label
+            feature shape will be ignored and will be treated as
+            a scalar.  Defaults to False.
 
     Returns:
         tuple: Test and validation DataLoaders.
     """
     test_ds = TestDataSet(
-        test_size, feature_shape, label_shape, seed=seed
+        test_size, feature_shape, label_shape,
+        seed=seed, scalar_label=scalar_label
     )
     validation_ds = TestDataSet(
-        validation_size, feature_shape, label_shape, seed=seed
+        validation_size, feature_shape, label_shape,
+        seed=seed, scalar_label=scalar_label
     )
 
     test_dl = DataLoader(

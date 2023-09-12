@@ -13,7 +13,12 @@ from ..ptmodels import bic_pytorch as bp
 from ..datasets import testing_loader
 
 logger = logging.getLogger('__test_bic__')
-logger.setLevel(logging.DEBUG)
+logging.basicConfig(
+    filename='logs/test_bic.log',
+    encoding='utf-8',
+    level=logging.DEBUG
+)
+logger.setLevel(logging.WARNING)
 
 
 def test_forward_output_logistic() -> None:
@@ -44,7 +49,7 @@ def test_forward_output_convnet() -> None:
     manual_seed(0)
     # ConvNet is hard-coded to handle 128x128 images.
     x_in = rand((1, 3, 128, 128))
-    x_out = bp.ConvNet(7, 3, 16)(x_in)
+    x_out = bp.ConvNet(7, 3, 768, 16)(x_in)
     assert x_out.item() == pytest.approx(0.2774, 1e-3)
 
 
@@ -67,12 +72,12 @@ def test_training() -> None:
         Tests for all BIC models in bp module.
     """
     t_dl, v_dl = testing_loader.load_TestDataSets(
-        8, 4, (3, 64, 64), (2,), 2, 2
+        8, 4, (3, 64, 64), (), 2, 2, scalar_label=True
     )
     n_in = 64 * 64 * 3
     test_l = bp.Logistic(n_in=n_in)
     test_p = bp.Perceptron(n_layers=(n_in, 1000, 100))
-    test_c = bp.ConvNet(3, 3, 3, 4 * 4 * 12)
+    test_c = bp.ConvNet(3, 3, 4 * 4 * 12, 16)
     opt_l = SGD(test_l.parameters(), lr=1e-3)
     opt_p = SGD(test_p.parameters(), lr=1e-3)
     opt_c = SGD(test_c.parameters(), lr=1e-3)
@@ -91,8 +96,6 @@ def test_training() -> None:
         logger.error('Exception: %s', e, exc_info=True)
         success_l = False
 
-    assert success_l
-
     # Perceptron run.
     try:
         bp.train_bic_model(
@@ -103,20 +106,15 @@ def test_training() -> None:
         logger.error('Exception: %s', e, exc_info=True)
         success_p = False
 
-    assert success_p
-
     # ConvNet run.
     try:
         bp.train_bic_model(
             t_dl, v_dl, test_c, opt_c, loss, 1, 'cpu'
         )
+        logger.warning('hello')
 
     except Exception as e:
         logger.error('Exception: %s', e, exc_info=True)
         success_c = False
 
-    assert success_c
-
-
-if __name__ == '__main__':
-    pass
+    assert (success_l, success_p, success_c) == (1, 1, 1)

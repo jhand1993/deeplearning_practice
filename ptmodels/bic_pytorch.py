@@ -65,12 +65,15 @@ class ConvNet(torch.nn.Module):
     """ Two layer ConvNet that then feeds into two linear layers before a
         sigmoid function.  Stride is fixed to 1.
     """
-    def __init__(self, k1: int, k2: int, n3: int, pad='same') -> None:
+    def __init__(
+            self, k1: int, k2: int, n_convflat: int, n3: int, pad='same'
+    ) -> None:
         """
 
         Args:
             k1 (int): Square kernel size for convolution layer 1.
             k2 (int): Square kernel size for convoltuion layer 2.
+            n_convflat (int): Length of flattened convolutions output.
             n3 (int): Linear layer 3 output size.
             pad (str or float, optional): Padding to preserve image size.
                 Defaults to 'same' to preserve image size.
@@ -82,6 +85,7 @@ class ConvNet(torch.nn.Module):
         self.k2 = k2
         self.p1 = pad
         self.p2 = pad
+        self.n_convflat = n_convflat
         self.n3 = n3
 
         self.convnet = torch.nn.Sequential(
@@ -94,7 +98,7 @@ class ConvNet(torch.nn.Module):
             torch.nn.Flatten(),
             # Poolings cuts pixel count to 8 * 8, while channel count
             # increases to 12: flattened vector should be 8 * 8 * 12 = 768.
-            torch.nn.Linear(768, n3),
+            torch.nn.Linear(n_convflat, n3),
             torch.nn.ReLU(),
             torch.nn.Linear(n3, 1)
         )
