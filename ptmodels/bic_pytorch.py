@@ -66,7 +66,12 @@ class ConvNet(torch.nn.Module):
         sigmoid function.  Stride is fixed to 1.
     """
     def __init__(
-            self, k1: int, k2: int, n_convflat: int, n3: int, pad='same'
+        self,
+        k1: int,
+        k2: int,
+        n_convflat: int,
+        n3: int,
+        pad='same'
     ) -> None:
         """
 
@@ -116,13 +121,13 @@ class ConvNet(torch.nn.Module):
 
 
 def train_bic_model(
-        train_dl: torch.utils.data.DataLoader,
-        valid_dl: torch.utils.data.DataLoader,
-        model: torch.nn.Module,
-        opt: torch.optim.Optimizer,
-        loss_fn: callable,
-        n_epoch: int,
-        device: str
+    train_dl: torch.utils.data.DataLoader,
+    valid_dl: torch.utils.data.DataLoader,
+    model: torch.nn.Module,
+    opt: torch.optim.Optimizer,
+    loss_fn: callable,
+    n_epoch: int,
+    device: str
 ) -> float:
     """ Trains binary classification model 'model'. 'opt' should be a
         PyTorch Optimizer object, while loss must be a callable scalar

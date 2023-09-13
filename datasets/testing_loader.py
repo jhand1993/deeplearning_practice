@@ -1,14 +1,16 @@
 from torch.utils.data import Dataset, DataLoader
 import torch
+from typing import Tuple
 
 
 def random_image_set(
-    shape: tuple[int], seed: int = 0
+    shape: Tuple[int],
+    seed: int = 0
 ) -> torch.Tensor:
     """ Generates a white noise data set of the requested shape.
 
     Args:
-        shape (tuple[int]): Shape of the data set
+        shape (Tuple[int]): Shape of the data set
         seed (int, optional): Random seed. Defaults to 0.
 
     Returns:
@@ -24,8 +26,8 @@ class TestDataSet(Dataset):
     def __init__(
             self,
             set_size: int,
-            feature_shape: tuple[int],
-            label_shape: tuple[int],
+            feature_shape: Tuple[int],
+            label_shape: Tuple[int],
             seed: int = 0,
             scalar_label: bool = False
     ) -> None:
@@ -81,8 +83,8 @@ class TestDataSet(Dataset):
 def load_TestDataSets(
     test_size: int,
     validation_size: int,
-    feature_shape: tuple[int],
-    label_shape: tuple[int],
+    feature_shape: Tuple[int],
+    label_shape: Tuple[int],
     batch_size_test: int,
     batch_size_validation: int,
     seed: int = 0,
@@ -94,8 +96,8 @@ def load_TestDataSets(
     Args:
         test_size (int): Size of test DataSet.
         validation_size (int): Size of validation DataSet.
-        feature_shape (tuple[int]): Shape of data set features.
-        label_shape (tuple[int]): Shape of data set labels.
+        feature_shape (Tuple[int]): Shape of data set features.
+        label_shape (Tuple[int]): Shape of data set labels.
         batch_size_test (int): Test DataLoader batch size.
         batch_size_validation (int): Validation DataLoader batch
             size.

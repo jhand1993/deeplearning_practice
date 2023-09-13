@@ -2,6 +2,8 @@ import torch
 from typing import Iterable
 from math import sqrt
 
+from ptmodels import tracking
+
 
 class BaseAE(torch.nn.Module):
     """ Torch.nn.Module subclass with autoencoder functionality.
@@ -167,8 +169,11 @@ class ConvNetAE(BaseAE):
         dimensionality by a factor of two per-axis.
     """
     def __init__(
-            self, channels: Iterable[int], k_layers: Iterable[int],
-            n_flat: int, n_latent: int
+        self,
+        channels: Iterable[int],
+        k_layers: Iterable[int],
+        n_flat: int,
+        n_latent: int
     ) -> None:
         """
         Args:
@@ -251,7 +256,10 @@ class ConvNetAE(BaseAE):
 
     @staticmethod
     def cn_block(
-        c_in: int, c_out: int, k: int, p: int
+        c_in: int,
+        c_out: int,
+        k: int,
+        p: int
     ) -> torch.nn.Sequential:
         """ ConvNet block that includes square kernel convolution
             with stride=1, ReLU activation, and max pooling.
@@ -283,7 +291,10 @@ class ConvNetAE(BaseAE):
 
     @staticmethod
     def upcn_block(
-        c_in: int, c_out: int, k: int, d: int
+        c_in: int,
+        c_out: int,
+        k: int,
+        d: int
     ) -> torch.nn.Sequential:
         """ A combination of upsampling by factor d, followed by a
             convolution with kernel (k, k) with padding to preserve
@@ -316,13 +327,15 @@ class ConvNetAE(BaseAE):
 
 
 def train_AE(
-        train_dl: torch.utils.data.DataLoader,
-        valid_dl: torch.utils.data.DataLoader,
-        model: torch.nn.Module,
-        opt: torch.optim.Optimizer,
-        loss_fn: callable,
-        n_epoch: int,
-        device: str,
+    train_dl: torch.utils.data.DataLoader,
+    valid_dl: torch.utils.data.DataLoader,
+    model: torch.nn.Module,
+    opt: torch.optim.Optimizer,
+    loss_fn: callable,
+    n_epoch: int,
+    device: str,
+    tracker: tracking.BaseTracker = tracking.BaseTracker(),
+    tracker_stride: int = 100
 ) -> float:
     """ Trains an autoencoder model 'model'. 'opt' should be a
         PyTorch Optimizer object, while loss must be a callable scalar
@@ -337,6 +350,10 @@ def train_AE(
         loss_fn (callable): Scalar function used to calculate loss.
         n_epoch (int): Number of epochs.
         device (str): Device to run Tensors on.
+        tracker (tracking.BaseTracker): Tracking object.  Defaults to an
+            instance of tracking.BaseTracker.
+        tracker_stride (int): Number of iterations before logging log tracks
+            for training and validation.  Defaults to 100.
 
     Returns:
         float: Validation loss for final epoch.
@@ -375,6 +392,11 @@ def train_AE(
                     f'Batch [{s:>5d}/{fs:>5d}] loss: {loss.item():7f}.'
                 )
 
+            # Update tracker when i is a multiple of tracker_stride
+            if i % tracker_stride:
+                record_i = [epoch + 1, i, loss.item()]
+                tracker.track_train_loss(record_i)
+
             # After each batch, zero the gradients.
             opt.zero_grad()
 
@@ -386,33 +408,42 @@ def train_AE(
         # waste of resources!
         with torch.no_grad():
             # We don't need to call the optimizer here since we are just
-            # evaluating.
-            losses, n_b = map(
-                torch.tensor,
-                zip(
-                    *[
-                        (loss_fn(
-                            model(xv.to(device)),
-                            xv.to(device)
-                        ),
-                            xv.shape[0])
-                        for xv, _ in valid_dl
-                    ]
-                )
-            )
+            # evaluating.  Here is a list comprehension approach if desired.
+            # losses, n_b = map(
+            #     torch.tensor,
+            #     zip(
+            #         *[
+            #             (loss_fn(
+            #                 model(xv.to(device)),
+            #                 xv.to(device)
+            #             ),
+            #                 xv.shape[0])
+            #             for xv, _ in valid_dl
+            #         ]
+            #     )
+            # )
 
             # The code above is a bit dense, so I've broken it up into a
             # for-loop below for a more verbose equivalence for reference.
-            # losses = []
-            # n_b = []
-            # for xv, _ in valid_dl:
-            #     pred = model(xv.to(device))
-            #     loss = loss_fn(pred, xv.to(device))
-            #     losses.append(loss)
-            #     n_b.append(len(xv.shape[0]))
-            # losses = torch.tensor(losses)
-            # n_b = torch.tensor(n_b)
+            losses = []
+            n_b = []
+            for xv, _ in valid_dl:
+                pred = model(xv.to(device))
+                loss = loss_fn(pred, xv.to(device))
 
+                # Update tracker when i is a multiple of tracker_stride
+                if i % tracker_stride:
+                    record_i = [epoch + 1, i, loss.item()]
+                    tracker.track_validation_loss(record_i)
+
+                losses.append(loss)
+                n_b.append(xv.shape[0])
+
+            # Convert lists to tensors for calculating epoch validation loss.
+            losses = torch.tensor(losses)
+            n_b = torch.tensor(n_b)
+
+            # Calculate validation loss for entire epoch.
             validation_loss = torch.sum(losses) / len(n_b)
 
         # Log validation loss after each training epoch.
@@ -420,4 +451,4 @@ def train_AE(
             f'Epoch {epoch + 1} validation loss: {validation_loss.item():>7f}.'
         )
         print('---------------------------------------')
-    return validation_loss
+    return tracker

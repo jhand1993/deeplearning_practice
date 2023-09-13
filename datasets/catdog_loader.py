@@ -1,8 +1,10 @@
+from pathlib import Path
+from typing import Callable
+
 from torch.utils.data import Dataset
 from torchvision.transforms import ToTensor
 from torch import tensor
 from skimage import io
-from pathlib import Path
 
 
 class CatDogDataSet(Dataset):
@@ -12,7 +14,10 @@ class CatDogDataSet(Dataset):
         subpath.
     """
     def __init__(
-            self, img_dir, transform=None, target_transform=None
+            self,
+            img_dir: str,
+            transform: Callable = None,
+            target_transform: Callable = None
     ) -> None:
         """
         Args:
@@ -50,10 +55,10 @@ class CatDogDataSet(Dataset):
             len(list(self.dog_path.glob('*.jpg')))
 
     def __getitem__(self, idx: int) -> tuple:
-        """ Return elements 'idx' of the data set
+        """ Return element 'idx' of the data set
 
         Args:
-            idx (List[int]): Indices to return
+            idx (int): index to return
         """
         idx_path = self.idx_to_name[idx]
 
@@ -73,7 +78,7 @@ class CatDogDataSet(Dataset):
 
         return image, label
 
-    def _get_label(self, idx_path) -> float:
+    def _get_label(self, idx_path: Path) -> float:
         """ Gets target label from path information.  Specifically, return 1
             if the path's directory is self.cat_path, else return 0.
 
