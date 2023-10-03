@@ -6,8 +6,8 @@ import logging
 from torch.nn.functional import binary_cross_entropy_with_logits
 from torch.optim import SGD
 
-from ..ptmodels import vae_pytorch as vp
-from ..datasets import testing_loader as tl
+from ptmodels import vae_pytorch as vp
+from datasets import testing_loader as tl
 
 logger = logging.getLogger('__test_vae__')
 logging.basicConfig(

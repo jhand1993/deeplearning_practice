@@ -9,8 +9,8 @@ from torch import rand, manual_seed
 from torch.optim import SGD
 from torch.nn.functional import binary_cross_entropy_with_logits
 
-from ..ptmodels import bic_pytorch as bp
-from ..datasets import testing_loader
+from ptmodels import bic_pytorch as bp
+from datasets import testing_loader
 
 logger = logging.getLogger('__test_bic__')
 logging.basicConfig(
