@@ -22,4 +22,4 @@ jobs:
           name: run tests
           command: |
             source testenv/bin/activate
-            pytest -v --cov=bic_pytorch
+            pytest -v
