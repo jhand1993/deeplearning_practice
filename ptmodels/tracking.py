@@ -53,7 +53,7 @@ class BaseTracker(object):
 
     @staticmethod
     def stratify_loss_list(x: List) -> List:
-        """ Takes either _train_loss or _validation_loss and splits stratifies
+        """ Takes either _train_loss or _validation_loss and stratifies
             records into sublists for each epoch.
 
         Args:

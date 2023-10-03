@@ -1,5 +1,6 @@
 import torch
 from typing import Iterable
+from ptmodels import tracking
 
 
 class Logistic(torch.nn.Module):
@@ -127,7 +128,9 @@ def train_bic_model(
     opt: torch.optim.Optimizer,
     loss_fn: callable,
     n_epoch: int,
-    device: str
+    device: str,
+    tracker: tracking.BaseTracker = tracking.BaseTracker(),
+    tracker_stride: int = 100
 ) -> float:
     """ Trains binary classification model 'model'. 'opt' should be a
         PyTorch Optimizer object, while loss must be a callable scalar
@@ -142,6 +145,10 @@ def train_bic_model(
         loss_fn (callable): Scalar function used to calculate loss.
         n_epoch (int): Number of epochs.
         device (str): Device to run Tensors on.
+        tracker (tracking.BaseTracker): Tracking object.  Defaults to an
+            instance of tracking.BaseTracker.
+        tracker_stride (int): Number of iterations before logging log tracks
+            for training and validation.  Defaults to 100.
 
     Returns:
         float: Validation loss for final epoch.
@@ -177,6 +184,10 @@ def train_bic_model(
                 print(
                     f'Batch [{s:>5d}/{full_size:>5d}] loss: {loss.item():7f}.'
                 )
+            # Update tracker when i is a multiple of tracker_stride
+            if batch % tracker_stride:
+                record_i = [epoch + 1, batch, loss.item()]
+                tracker.track_train_loss(record_i)
 
             # Fifth, after each batch, zero the gradients.
             opt.zero_grad()
@@ -190,26 +201,35 @@ def train_bic_model(
         with torch.no_grad():
             # We don't need to call the optimizer here since we are just
             # evaluating.
-            losses, n_b = map(
-                torch.tensor,
-                zip(
-                    *[(loss_fn(model(xv.to(device)), yv.to(device)), len(yv))
-                        for xv, yv in valid_dl]
-                )
-            )
+            # losses, n_b = map(
+            #     torch.tensor,
+            #     zip(
+            #         *[(loss_fn(model(xv.to(device)), yv.to(device)), len(yv))
+            #             for xv, yv in valid_dl]
+            #     )
+            # )
 
             # The code above is a bit dense, so I've broken it up into a
             # for-loop below for a more verbose equivalence for reference.
-            # losses = []
-            # n_b = []
-            # for xv, yv in valid_dl:
-            #     pred = model(xv.to(device))
-            #     loss = loss_fn(pred, yv.to(device))
-            #     losses.append(loss)
-            #     n_b.append(len(yv))
-            # losses = torch.tensor(losses)
-            # n_b = torch.tensor(n_b)
+            losses = []
+            n_b = []
+            for xv, yv in valid_dl:
+                pred = model(xv.to(device))
+                loss = loss_fn(pred, yv.to(device))
 
+                # Update tracker when i is a multiple of tracker_stride
+                if batch % tracker_stride:
+                    record_i = [epoch + 1, batch, loss.item()]
+                    tracker.track_validation_loss(record_i)
+
+                losses.append(loss)
+                n_b.append(len(yv))
+
+            # Convert lists to tensors for calculating epoch validation loss.
+            losses = torch.tensor(losses)
+            n_b = torch.tensor(n_b)
+
+            # Calculate validation loss for entire epoch.
             validation_loss = torch.sum(losses) / len(n_b)
 
         # Log validation loss after each training epoch.

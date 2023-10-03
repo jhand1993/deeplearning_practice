@@ -235,6 +235,7 @@ def matching_matrix_heatmap(
     else:
         n = 1
 
+    # Plot the confusion matrix.
     cmatrix = confusion_matrix(label_true, label_pred) / n
     fig = plt.figure(figsize=figsize)
     ax = fig.add_subplot()

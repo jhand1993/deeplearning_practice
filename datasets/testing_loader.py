@@ -24,12 +24,12 @@ class TestDataSet(Dataset):
     """ Test datat set consisting of white noise.
     """
     def __init__(
-            self,
-            set_size: int,
-            feature_shape: Tuple[int],
-            label_shape: Tuple[int],
-            seed: int = 0,
-            scalar_label: bool = False
+        self,
+        set_size: int,
+        feature_shape: Tuple[int],
+        label_shape: Tuple[int],
+        seed: int = 0,
+        scalar_label: bool = False
     ) -> None:
         """
         Args:
