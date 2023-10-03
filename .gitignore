@@ -121,6 +121,7 @@ test*.ipynb
 
 # Data set subdirectories
 /datasets/kagglecatsanddogs_5340
+/datasets/MNIST
 
 # old notebooks
 /oldnotebooks

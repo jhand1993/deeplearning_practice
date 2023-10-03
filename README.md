@@ -1,6 +1,6 @@
 # Deep Learning Practice Projects with PyTorch
 
-Just a personal repository to keep track of some PyTorch practice implementations with a dash of unit testing practice.
+Just a personal repository to keep track of some PyTorch practice implementations with a dash of unit testing practice.  Requires Python 3.9.x.
 
 ## Project One: Binary Image Classifier
 
@@ -8,7 +8,7 @@ Logistics, three-layer perceptron, and custom ConvNet for binary image classific
 
 ## Project Two: Encoders with Images
 
-Autoencoders and variational autoencoders on some test image sets. 
+Autoencoders and variational autoencoders on some test image sets.
 
 ## Project Three: Encoders with Images
 
